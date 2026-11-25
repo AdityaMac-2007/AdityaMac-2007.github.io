@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aditya — Systems, Storage & Interactive Arcade</title>
+  <style>
+    :root {
+      --bg-deep: #071419;
+      --bg-panel: rgba(11, 31, 39, 0.86);
+      --border: rgba(254, 240, 221, 0.14);
+      --ivory: #FEF0DD;
+      --muted: #93B5BE;
+      --saffron: #F7A724;
+      --mint: #34D399;
+      --crimson: #EF4444;
+      --sky: #60A5FA;
+      --spring-ease: cubic-bezier(0.22, 1.4, 0.36, 1);
+      --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      background:
+        radial-gradient(1200px 600px at 15% -10%, rgba(247, 167, 36, 0.10), transparent 60%),
+        radial-gradient(900px 550px at 90% 10%, rgba(52, 211, 153, 0.08), transparent 60%),
+        linear-gradient(180deg, #061217 0%, #091b22 52%, #050f14 100%);
+      color: var(--ivory);
+      font-family: var(--sans);
+      overflow-x: hidden;
+      padding-bottom: 110px;
+    }
+
+    #weather-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 60;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      transition: opacity 0.35s ease;
+    }
+    #weather-canvas.hidden { opacity: 0; }
+
+    .control-dock {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 100;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      background: rgba(6, 18, 23, 0.90);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 8px 12px;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(247, 167, 36, 0.12);
+      border: 1px solid rgba(247, 167, 36, 0.35);
+      color: var(--saffron);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--mint);
+      box-shadow: 0 0 8px var(--mint);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.55; }
+    }
+
+    .season-group {
+      display: inline-flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 3px;
+      border-radius: 12px;
+      border: 1px solid rgba(254, 240, 221, 0.08);
+    }
+
+    .pill-btn {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: transform 0.25s var(--spring-ease), background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .pill-btn:hover { color: var(--ivory); background: rgba(254, 240, 221, 0.08); transform: translateY(-1px); }
+    .pill-btn.active { background: rgba(247, 167, 36, 0.2); color: var(--saffron); border-color: rgba(247, 167, 36, 0.45); }
+
+    .toggle-btn {
+      appearance: none;
+      border: 1px solid rgba(52, 211, 153, 0.45);
+      background: rgba(52, 211, 153, 0.14);
+      color: var(--mint);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 11px;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: transform 0.25s var(--spring-ease), background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .toggle-btn:hover { transform: scale(1.04); }
+    .toggle-btn.off { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.14); color: #FCA5A5; }
+
+    .audio-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(254, 240, 221, 0.05);
+      color: var(--ivory);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: transform 0.25s var(--spring-ease), border-color 0.2s, background 0.2s;
+    }
+    .audio-btn:hover { transform: scale(1.04); border-color: var(--saffron); }
+    .audio-btn.playing { border-color: var(--saffron); background: rgba(247, 167, 36, 0.18); color: var(--saffron); }
+
+    .shell {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 82px 24px 36px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .identity { display: flex; align-items: center; gap: 14px; }
+
+    .monogram {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #F7A724 0%, #EF4444 100%);
+      color: #071419;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 8px 24px rgba(247, 167, 36, 0.28);
+      flex-shrink: 0;
+    }
+
+    .identity h1 { font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; }
+    .identity p { color: var(--muted); font-size: 13.5px; margin-top: 3px; font-family: var(--mono); }
+
+    .quick-links { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .ext-link {
+      text-decoration: none;
+      color: var(--ivory);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 14px;
+      border-radius: 12px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      transition: transform 0.25s var(--spring-ease), border-color 0.2s, color 0.2s;
+    }
+    .ext-link:hover { transform: translateY(-2px); border-color: var(--saffron); color: var(--saffron); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+      .control-dock { position: static; margin: 12px 16px 0; justify-content: center; }
+      .shell { padding-top: 22px; }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--saffron);
+      font-weight: 700;
+    }
+    .panel-sub { color: var(--muted); font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+    .doom-frame-wrap {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: #04080a;
+      box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.75);
+    }
+
+    #doom-canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 10;
+      image-rendering: pixelated;
+    }
+
+    .doom-hud {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      font-family: var(--mono);
+    }
+
+    .hud-cell {
+      background: rgba(4, 12, 16, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .hud-label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; }
+    .hud-val { font-size: 18px; font-weight: 800; margin-top: 2px; }
+
+    .doom-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      justify-content: center;
+    }
+
+    .arcade-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(254, 240, 221, 0.06);
+      color: var(--ivory);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 13px;
+      border-radius: 11px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.18s var(--spring-ease), background 0.15s, border-color 0.15s;
+    }
+    .arcade-btn:hover { background: rgba(247, 167, 36, 0.18); border-color: var(--saffron); transform: translateY(-2px); }
+    .arcade-btn:active { transform: scale(0.95); }
+    .arcade-btn.fire { background: rgba(239, 68, 68, 0.22); border-color: rgba(239, 68, 68, 0.6); color: #FECACA; }
+
+    .switch-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .switch-tab {
+      appearance: none;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: rgba(4, 12, 16, 0.6);
+      color: var(--muted);
+      border-radius: 14px;
+      padding: 11px 12px;
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: transform 0.25s var(--spring-ease), border-color 0.2s, background 0.2s, color 0.2s;
+    }
+    .switch-tab:hover { color: var(--ivory); border-color: rgba(247, 167, 36, 0.4); transform: translateY(-2px); }
+    .switch-tab.active { background: rgba(247, 167, 36, 0.14); border-color: var(--saffron); color: var(--ivory); }
+    .switch-slot { font-size: 10px; color: var(--saffron); display: block; margin-bottom: 3px; }
+    .switch-name { font-size: 13px; font-weight: 700; display: block; }
+
+    .inspector {
+      background: rgba(4, 12, 16, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      font-family: var(--mono);
+    }
+    .inspector-tag {
+      display: inline-block;
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(52, 211, 153, 0.14);
+      color: var(--mint);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      margin-bottom: 10px;
+    }
+    .inspector h3 { font-family: var(--sans); font-size: 20px; margin-bottom: 8px; color: var(--ivory); }
+    .inspector p { font-size: 12.5px; line-height: 1.65; color: var(--muted); margin-bottom: 14px; }
+    .spec-list { list-style: none; display: grid; gap: 7px; margin-bottom: 16px; font-size: 12px; }
+    .spec-list li {
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: rgba(254, 240, 221, 0.04);
+      border-left: 3px solid var(--saffron);
+      color: var(--ivory);
+    }
+    .open-repo-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      background: var(--saffron);
+      color: #071419;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 10px 15px;
+      border-radius: 12px;
+      transition: transform 0.25s var(--spring-ease), filter 0.2s;
+    }
+    .open-repo-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+
+    .janitor-note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.28);
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: #BFDBFE;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="weather-canvas" aria-hidden="true"></canvas>
+
+  <div class="control-dock" role="region" aria-label="Weather and Pixel Janitor Controls">
+    <span class="live-badge" id="weather-status">
+      <span class="pulse-dot"></span>
+      <span id="weather-text">INDIA • WINTER</span>
+    </span>
+    <div class="season-group" role="group" aria-label="Season selector">
+      <button class="pill-btn" data-season="auto" title="Auto-detect India season">Auto</button>
+      <button class="pill-btn" data-season="winter" title="Winter snowfall">❄️</button>
+      <button class="pill-btn" data-season="spring" title="Spring green leaves">🍃</button>
+      <button class="pill-btn" data-season="autumn" title="Autumn maple leaves">🍁</button>
+      <button class="pill-btn" data-season="monsoon" title="Monsoon rain">🌧️</button>
+    </div>
+    <button class="toggle-btn" id="toggle-weather-btn">Animation: ON</button>
+    <button class="audio-btn" id="toggle-audio-btn" title="Toggle retro synth soundtrack">♪ Synth: OFF</button>
+  </div>
+
+  <main class="shell">
+    <header class="topbar">
+      <div class="identity">
+        <div class="monogram">AC</div>
+        <div>
+          <h1>Aditya</h1>
+          <p>Systems & Storage Engines • Rust, Python, LSM-Trees & 3D Raycasters</p>
+        </div>
+      </div>
+      <nav class="quick-links">
+        <a class="ext-link" id="gh-profile-link" href="#projects" target="_blank" rel="noopener">GitHub Profile ↗</a>
+        <a class="ext-link" id="gh-lsm-link" href="#projects" target="_blank" rel="noopener">lsm-engine ↗</a>
+      </nav>
+    </header>
+
+    <section class="grid" id="projects">
+      <div class="panel">
+        <div class="panel-header">
+          <span>E1M1 // ADITYA'S LSM-HANGAR — LIVE 3D DOOM</span>
+          <span class="panel-sub">WASD / Arrows + Space to Fire</span>
+        </div>
+        <div class="doom-frame-wrap">
+          <canvas id="doom-canvas" width="480" height="300"></canvas>
+        </div>
+        <div class="doom-hud">
+          <div class="hud-cell">
+            <div class="hud-label">AMMO</div>
+            <div class="hud-val" id="hud-ammo" style="color: var(--saffron);">50</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">HEALTH</div>
+            <div class="hud-val" id="hud-hp" style="color: var(--mint);">100%</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">FRAGS</div>
+            <div class="hud-val" id="hud-frags" style="color: var(--crimson);">0</div>
+          </div>
+          <div class="hud-cell">
+            <div class="hud-label">TARGET</div>
+            <div class="hud-val" id="hud-status" style="color: var(--sky); font-size: 13px; padding-top: 4px;">LOCKED</div>
+          </div>
+        </div>
+        <div class="doom-controls">
+          <button class="arcade-btn" data-act="left">◀ TURN</button>
+          <button class="arcade-btn" data-act="forward">▲ FWD</button>
+          <button class="arcade-btn" data-act="back">▼ BACK</button>
+          <button class="arcade-btn" data-act="right">▶ TURN</button>
+          <button class="arcade-btn fire" data-act="fire">🔥 FIRE PLASMA</button>
+          <button class="arcade-btn" data-act="reset">↻ RESET</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span>SYSTEMS SWITCHBOARD</span>
+          <span class="panel-sub">Click a slot to inspect</span>
+        </div>
+
+        <div class="switch-tabs" id="project-tabs">
+          <button class="switch-tab active" data-proj="lsm">
+            <span class="switch-slot">[SLOT 01 • RUST]</span>
+            <span class="switch-name">lsm-engine</span>
+          </button>
+          <button class="switch-tab" data-proj="serverless">
+            <span class="switch-slot">[SLOT 02 • PYTHON]</span>
+            <span class="switch-name">coldstart_bench</span>
+          </button>
+          <button class="switch-tab" data-proj="hospital">
+            <span class="switch-slot">[SLOT 03 • DBMS]</span>
+            <span class="switch-name">Hospital_DBMS</span>
+          </button>
+          <button class="switch-tab" data-proj="pokemon">
+            <span class="switch-slot">[SLOT 04 • GAME]</span>
+            <span class="switch-name">pokemon-royale</span>
+          </button>
+        </div>
+
+        <div class="inspector" id="project-inspector"></div>
+
+        <div class="janitor-note" id="janitor-telemetry">
+          🧹 Pixel Janitor is watching the bottom of your screen. Snow, leaves, or rain pile up across the full viewport and he walks in from the side to sweep it clean continuously. Toggle <b>Animation: ON/OFF</b> anytime above.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const GH_OWNER = 'AdityaMac-2007';
+    const GH_BASE = ['https:', '', 'github.com', GH_OWNER].join('/');
+    document.getElementById('gh-profile-link').href = GH_BASE;
+    document.getElementById('gh-lsm-link').href = GH_BASE + '/lsm-engine';
+
+    const wCanvas = document.getElementById('weather-canvas');
+    const wCtx = wCanvas.getContext('2d');
+    const weatherTextEl = document.getElementById('weather-text');
+    const toggleWeatherBtn = document.getElementById('toggle-weather-btn');
+
+    const PX = 4;
+    let vw = window.innerWidth;
+    let vh = window.innerHeight;
+    let cols = 0;
+    let pile = [];
+
+    let weatherEnabled = localStorage.getItem('aditya_weather_on') !== 'false';
+    let manualSeason = localStorage.getItem('aditya_season_mode') || 'auto';
+    let liveSeason = 'winter';
+    let liveTempC = 16.5;
+    let activeSeason = 'winter';
+
+    const SEASON_META = {
+      winter:  { icon: '❄️', label: 'WINTER SNOWFALL', baseTemp: 15.5, colors: ['#FFFFFF', '#DCEEFF', '#B7D8F7'], pileColors: ['#E6F2FF', '#C4DCF5', '#9FC2E8'] },
+      spring:  { icon: '🍃', label: 'SPRING LEAVES',   baseTemp: 28.0, colors: ['#7EE048', '#4BB532', '#2E7D22'], pileColors: ['#58B93A', '#3B8E26', '#255E18'] },
+      autumn:  { icon: '🍁', label: 'AUTUMN MAPLE',    baseTemp: 24.5, colors: ['#FF9E1B', '#F04E1F', '#C9201A'], pileColors: ['#E85D1A', '#C83219', '#9A1D12'] },
+      monsoon: { icon: '🌧️', label: 'MONSOON RAIN',    baseTemp: 29.0, colors: ['#CFE8FF', '#5CA8FF', '#2E6FE0'], pileColors: ['#4E9BFF', '#2A6FD6', '#1B4B9C'] },
+    };
+
+    const JANITOR_WALK = [
+      '.....KKKKKK.....',
+      '....KBBBBBBK....',
+      '...KBBLLLLBBK...',
+      '...KBBBBBBBBKK..',
+      '..KKKHHHHHHKK...',
+      '...KHSSKSSKHK...',
+      '...KHSSKSSKHK...',
+      '....KSSSSSSK....',
+      '..MK.KKSSKK.....',
+      '.KMKBBWWWWBBK...',
+      '.KMSBBBBBBBBK...',
+      '..MK.KBBBBK.K...',
+      '..MK.KBBKBBK.KKK',
+      '.KWGK.KBBKBBKBLB',
+      'KWWWGKKDDKDDKBBB',
+      'KKKKKK.KKKKK.KKK',
+    ];
+
+    const JANITOR_MOP = [
+      '......KKKKKK....',
+      '.....KBBBBBBK...',
+      '....KBBLLLLBBK..',
+      '....KBBBBBBBBKK.',
+      '...KKKHHHHHHKK..',
+      '....KHSSKSSKHK..',
+      '....KHSSKSSKHK..',
+      '.....KSSSSSSK...',
+      '....KBBWWWWBBK..',
+      '...KSBBBBBBBBK..',
+      '....KMMBBBBBKSK.',
+      '.KKK.KBMKBBKMMK.',
+      'KBLBK.KBBKBBKMK.',
+      'KBBBK.KDDKDDKWGK',
+      '.KKK..KKK.KKWWWG',
+      '...........KKKKK',
+    ];
+
+    const PALETTE = {
+      K: '#121820', B: '#2563EB', L: '#60A5FA', H: '#2E2018',
+      S: '#F7C9A4', W: '#F1F5F9', G: '#CBD5E1', M: '#9A5B25', D: '#3B2F2F',
+    };
+
+    const SNOW_BIG = ['..1..', '.121.', '12021', '.121.', '..1..'];
+    const LEAF_GREEN = ['....2.', '..101.', '.1001.', '2101..', '22....'];
+    const LEAF_MAPLE = ['..1...', '1.0.1.', '.000..', '10201.', '..2...'];
+
+    let particles = [];
+    let splashes = [];
+
+    const janitor = {
+      state: 'waiting',
+      x: -90,
+      dir: 1,
+      speed: 78,
+      frameTimer: 0,
+      cooldown: 1.5,
+    };
+
+    function detectIndiaClimate() {
+      const now = new Date();
+      const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+      const ist = new Date(utcMs + 5.5 * 3600000);
+      const m = ist.getMonth() + 1;
+      const h = ist.getHours();
+      let season = 'spring';
+      if (m === 11 || m === 12 || m <= 2) season = 'winter';
+      else if (m >= 6 && m <= 9) season = 'monsoon';
+      else if (m === 10) season = 'autumn';
+      const base = SEASON_META[season].baseTemp;
+      const diurnal = Math.sin(((h - 5) / 24) * Math.PI * 2) * 4.5;
+      liveSeason = season;
+      liveTempC = Number((base + diurnal).toFixed(1));
+      if (manualSeason === 'auto') activeSeason = liveSeason;
+    }
+
+    function resizeWeather() {
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+      wCanvas.width = vw;
+      wCanvas.height = vh;
+      const newCols = Math.ceil(vw / PX);
+      const nextPile = new Float32Array(newCols);
+      for (let i = 0; i < Math.min(newCols, pile.length); i++) nextPile[i] = pile[i];
+      cols = newCols;
+      pile = nextPile;
+      initParticles();
+    }
+
+    function createParticle(randomY = false) {
+      const isRain = activeSeason === 'monsoon';
+      return {
+        x: Math.random() * vw,
+        y: randomY ? Math.random() * vh : -24 - Math.random() * 60,
+        vy: isRain ? (340 + Math.random() * 180) : (activeSeason === 'winter' ? (36 + Math.random() * 44) : (48 + Math.random() * 46)),
+        vx: isRain ? (-24 - Math.random() * 14) : (-16 + Math.random() * 32),
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 1.4 + Math.random() * 1.8,
+        big: Math.random() > 0.45,
+        colorIdx: Math.floor(Math.random() * 3),
+      };
+    }
+
+    function initParticles() {
+      const count = activeSeason === 'monsoon' ? 95 : 68;
+      particles = Array.from({ length: count }, () => createParticle(true));
+    }
+
+    function drawMatrix(ctx, matrix, x, y, scale, colorFn, flipX = false) {
+      const h = matrix.length, w = matrix[0].length;
+      for (let r = 0; r < h; r++) {
+        for (let c = 0; c < w; c++) {
+          const ch = matrix[r][c];
+          if (ch === '.') continue;
+          const col = colorFn(ch);
+          if (!col) continue;
+          ctx.fillStyle = col;
+          const drawC = flipX ? (w - 1 - c) : c;
+          ctx.fillRect(Math.round(x + drawC * scale), Math.round(y + r * scale), scale, scale);
+        }
+      }
+    }
+
+    function addToPile(pxX, amount) {
+      const c = Math.max(0, Math.min(cols - 1, Math.floor(pxX / PX)));
+      const maxH = activeSeason === 'monsoon' ? 4.5 : 10.5;
+      pile[c] = Math.min(maxH, pile[c] + amount);
+      if (c > 0) pile[c - 1] = Math.min(maxH, pile[c - 1] + amount * 0.48);
+      if (c < cols - 1) pile[c + 1] = Math.min(maxH, pile[c + 1] + amount * 0.48);
+    }
+
+    function averagePileHeight() {
+      if (!cols) return 0;
+      let sum = 0;
+      for (let i = 0; i < cols; i++) sum += pile[i];
+      return sum / cols;
+    }
+
+    function spawnSweepDebris(x, y) {
+      const colors = SEASON_META[activeSeason].pileColors;
+      for (let i = 0; i < 3; i++) {
+        splashes.push({
+          x, y,
+          vx: janitor.dir * (30 + Math.random() * 55) + (Math.random() - 0.5) * 30,
+          vy: -45 - Math.random() * 55,
+          life: 0.45 + Math.random() * 0.25,
+          color: colors[Math.floor(Math.random() * colors.length)],
+        });
+      }
+    }
+
+    function updateWeatherUI() {
+      const meta = SEASON_META[activeSeason];
+      const tempVal = manualSeason === 'auto' ? liveTempC : meta.baseTemp;
+      const modeLabel = manualSeason === 'auto' ? `INDIA IST • ${tempVal.toFixed(1)}°C` : `PREVIEW • ${tempVal.toFixed(1)}°C`;
+      weatherTextEl.textContent = `${meta.icon} ${modeLabel} • ${meta.label}`;
+      document.querySelectorAll('.pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.season === manualSeason);
+      });
+      toggleWeatherBtn.textContent = weatherEnabled ? 'Animation: ON' : 'Animation: OFF';
+      toggleWeatherBtn.classList.toggle('off', !weatherEnabled);
+      wCanvas.classList.toggle('hidden', !weatherEnabled);
+    }
+
+    function setSeasonMode(mode) {
+      manualSeason = mode;
+      localStorage.setItem('aditya_season_mode', mode);
+      const next = mode === 'auto' ? liveSeason : mode;
+      if (next !== activeSeason) {
+        activeSeason = next;
+        pile.fill(0);
+        for (let i = 0; i < cols; i++) pile[i] = 1.2 + Math.sin(i * 0.14) * 0.5;
+        initParticles();
+      }
+      updateWeatherUI();
+    }
+
+    let lastTs = performance.now();
+    function tickWeather(now) {
+      const dt = Math.min(0.05, (now - lastTs) / 1000);
+      lastTs = now;
+
+      if (weatherEnabled) {
+        wCtx.clearRect(0, 0, vw, vh);
+        const meta = SEASON_META[activeSeason];
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.swayPhase += p.swaySpeed * dt;
+          const sway = activeSeason === 'monsoon' ? 0 : Math.sin(p.swayPhase) * 26;
+          p.x += (p.vx + sway) * dt;
+          p.y += p.vy * dt;
+
+          if (p.x < -20) p.x = vw + 16;
+          if (p.x > vw + 20) p.x = -16;
+
+          const colIdx = Math.max(0, Math.min(cols - 1, Math.floor(p.x / PX)));
+          const groundY = vh - pile[colIdx] * PX;
+
+          if (p.y >= groundY - 4) {
+            addToPile(p.x, activeSeason === 'monsoon' ? 0.22 : 0.42);
+            particles[i] = createParticle(false);
+            continue;
+          }
+
+          if (activeSeason === 'monsoon') {
+            wCtx.fillStyle = meta.colors[2];
+            wCtx.fillRect(Math.round(p.x), Math.round(p.y), PX, PX * 4);
+            wCtx.fillStyle = meta.colors[1];
+            wCtx.fillRect(Math.round(p.x), Math.round(p.y + PX), PX, PX * 2);
+            wCtx.fillStyle = meta.colors[0];
+            wCtx.fillRect(Math.round(p.x), Math.round(p.y + PX * 2), PX, PX);
+          } else if (activeSeason === 'winter') {
+            if (p.big) {
+              drawMatrix(wCtx, SNOW_BIG, p.x, p.y, 3, ch => meta.colors[Number(ch)]);
+            } else {
+              wCtx.fillStyle = meta.colors[p.colorIdx];
+              wCtx.fillRect(Math.round(p.x), Math.round(p.y), PX, PX);
+            }
+          } else if (activeSeason === 'spring') {
+            drawMatrix(wCtx, LEAF_GREEN, p.x, p.y, p.big ? 3 : 2, ch => meta.colors[Number(ch)]);
+          } else {
+            drawMatrix(wCtx, LEAF_MAPLE, p.x, p.y, p.big ? 3 : 2, ch => meta.colors[Number(ch)]);
+          }
+        }
+
+        for (let c = 0; c < cols; c++) {
+          const h = Math.floor(pile[c]);
+          if (h <= 0) continue;
+          const x = c * PX;
+          for (let layer = 0; layer < h; layer++) {
+            const y = vh - (layer + 1) * PX;
+            const colorIdx = layer === h - 1 ? 0 : (layer >= h - 3 ? 1 : 2);
+            wCtx.fillStyle = meta.pileColors[colorIdx];
+            wCtx.fillRect(x, y, PX, PX);
+          }
+        }
+
+        const avgH = averagePileHeight();
+        if (janitor.state === 'waiting') {
+          janitor.cooldown -= dt;
+          if (janitor.cooldown <= 0 && avgH >= 1.1) {
+            janitor.state = 'sweeping';
+            janitor.dir = Math.random() > 0.5 ? 1 : -1;
+            janitor.x = janitor.dir === 1 ? -72 : vw + 12;
+          }
+        } else if (janitor.state === 'sweeping') {
+          janitor.x += janitor.dir * janitor.speed * dt;
+          janitor.frameTimer += dt;
+
+          const mopCenterX = janitor.dir === 1 ? (janitor.x + 56) : (janitor.x + 8);
+          const mopCol = Math.floor(mopCenterX / PX);
+          let sweptHere = false;
+          for (let offset = -4; offset <= 4; offset++) {
+            const idx = mopCol + offset;
+            if (idx >= 0 && idx < cols && pile[idx] > 0.05) {
+              pile[idx] = Math.max(0, pile[idx] - 7.5 * dt);
+              sweptHere = true;
+            }
+          }
+          if (sweptHere && Math.random() < 0.35) spawnSweepDebris(mopCenterX, vh - 8);
+
+          const sprite = Math.floor(janitor.frameTimer * 4.5) % 2 === 0 ? JANITOR_MOP : JANITOR_WALK;
+          const scale = 4;
+          drawMatrix(wCtx, sprite, janitor.x, vh - 16 * scale, scale, ch => PALETTE[ch], janitor.dir === -1);
+
+          if ((janitor.dir === 1 && janitor.x > vw + 40) || (janitor.dir === -1 && janitor.x < -90)) {
+            janitor.state = 'waiting';
+            janitor.cooldown = 3.0;
+          }
+        }
+
+        for (let i = splashes.length - 1; i >= 0; i--) {
+          const s = splashes[i];
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vy += 220 * dt;
+          s.life -= dt;
+          if (s.life <= 0) { splashes.splice(i, 1); continue; }
+          wCtx.fillStyle = s.color;
+          wCtx.fillRect(Math.round(s.x), Math.round(s.y), PX, PX);
+        }
+      }
+
+      requestAnimationFrame(tickWeather);
+    }
+
+    document.querySelectorAll('.pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => setSeasonMode(btn.dataset.season));
+    });
+
+    toggleWeatherBtn.addEventListener('click', () => {
+      weatherEnabled = !weatherEnabled;
+      localStorage.setItem('aditya_weather_on', String(weatherEnabled));
+      if (!weatherEnabled) wCtx.clearRect(0, 0, vw, vh);
+      updateWeatherUI();
+    });
+
+    window.addEventListener('resize', resizeWeather);
+    detectIndiaClimate();
+    resizeWeather();
+    for (let i = 0; i < cols; i++) pile[i] = 1.4 + Math.sin(i * 0.14) * 0.6;
+    updateWeatherUI();
+    requestAnimationFrame(tickWeather);
+
+    /* PLAYABLE 3D DOOM */
+    const dCanvas = document.getElementById('doom-canvas');
+    const dCtx = dCanvas.getContext('2d');
+    const hudAmmo = document.getElementById('hud-ammo');
+    const hudHp = document.getElementById('hud-hp');
+    const hudFrags = document.getElementById('hud-frags');
+    const hudStatus = document.getElementById('hud-status');
+
+    const MAP = [
+      [1,1,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,1],
+      [1,0,2,0,0,0,0,2,0,1],
+      [1,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,3,3,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,1],
+      [1,0,2,0,0,0,0,2,0,1],
+      [1,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1],
+    ];
+
+    let player, enemies, muzzleFlash = 0;
+
+    function resetDoom() {
+      player = { x: 1.8, y: 7.2, a: -Math.PI / 3, ammo: 50, hp: 100, frags: 0 };
+      enemies = [
+        { name: 'CACODEMON', x: 5.2, y: 2.3, hp: 3, maxHp: 3, color: '#EF4444', eye: '#34D399' },
+        { name: 'HELL-BARON', x: 7.6, y: 3.6, hp: 4, maxHp: 4, color: '#A855F7', eye: '#F7A724' },
+        { name: 'CYBER-IMP', x: 3.1, y: 3.4, hp: 2, maxHp: 2, color: '#F97316', eye: '#FEF0DD' },
+      ];
+      muzzleFlash = 0;
+      syncDoomHud('LOCKED');
+    }
+
+    function syncDoomHud(statusText) {
+      hudAmmo.textContent = player.ammo;
+      hudHp.textContent = `${player.hp}%`;
+      hudFrags.textContent = player.frags;
+      if (statusText) hudStatus.textContent = statusText;
+    }
+
+    function canWalk(nx, ny) {
+      const mx = Math.floor(nx), my = Math.floor(ny);
+      return my >= 0 && my < MAP.length && mx >= 0 && mx < MAP[0].length && MAP[my][mx] === 0;
+    }
+
+    function doDoomAction(act) {
+      if (act === 'reset') { resetDoom(); return; }
+      if (act === 'left') player.a -= 0.24;
+      if (act === 'right') player.a += 0.24;
+      if (act === 'forward' || act === 'back') {
+        const dir = act === 'forward' ? 0.34 : -0.34;
+        const nx = player.x + Math.cos(player.a) * dir;
+        const ny = player.y + Math.sin(player.a) * dir;
+        if (canWalk(nx, ny)) { player.x = nx; player.y = ny; }
+      }
+      if (act === 'fire') {
+        if (player.ammo <= 0) { syncDoomHud('NO AMMO'); return; }
+        player.ammo -= 1;
+        muzzleFlash = 0.16;
+        let hitTarget = null, bestDist = 99;
+        for (const e of enemies) {
+          if (e.hp <= 0) continue;
+          const dx = e.x - player.x, dy = e.y - player.y;
+          const dist = Math.hypot(dx, dy);
+          let diff = Math.atan2(dy, dx) - player.a;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          if (Math.abs(diff) < 0.22 && dist < bestDist) { bestDist = dist; hitTarget = e; }
+        }
+        if (hitTarget) {
+          hitTarget.hp -= 1;
+          if (hitTarget.hp <= 0) {
+            player.frags += 1;
+            const alive = enemies.filter(e => e.hp > 0).length;
+            syncDoomHud(alive === 0 ? 'CLEARED!' : 'FRAGGED!');
+          } else { syncDoomHud('HIT!'); }
+        } else { syncDoomHud('MISS'); }
+      }
+    }
+
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space',' '].includes(e.key)) {
+        if (document.activeElement.tagName !== 'BUTTON') e.preventDefault();
+      }
+      keys[e.code] = true;
+      if (e.code === 'Space') doDoomAction('fire');
+    });
+    window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+    document.querySelectorAll('.arcade-btn').forEach(btn => {
+      btn.addEventListener('click', () => doDoomAction(btn.dataset.act));
+    });
+
+    function renderDoom(dt) {
+      if (keys['KeyA'] || keys['ArrowLeft']) player.a -= 2.1 * dt;
+      if (keys['KeyD'] || keys['ArrowRight']) player.a += 2.1 * dt;
+      if (keys['KeyW'] || keys['ArrowUp']) {
+        const nx = player.x + Math.cos(player.a) * 2.4 * dt;
+        const ny = player.y + Math.sin(player.a) * 2.4 * dt;
+        if (canWalk(nx, ny)) { player.x = nx; player.y = ny; }
+      }
+      if (keys['KeyS'] || keys['ArrowDown']) {
+        const nx = player.x - Math.cos(player.a) * 2.0 * dt;
+        const ny = player.y - Math.sin(player.a) * 2.0 * dt;
+        if (canWalk(nx, ny)) { player.x = nx; player.y = ny; }
+      }
+      if (muzzleFlash > 0) muzzleFlash = Math.max(0, muzzleFlash - dt);
+
+      const W = dCanvas.width, H = dCanvas.height;
+      const ceilGrad = dCtx.createLinearGradient(0, 0, 0, H / 2);
+      ceilGrad.addColorStop(0, '#070b10'); ceilGrad.addColorStop(1, '#1a1019');
+      dCtx.fillStyle = ceilGrad; dCtx.fillRect(0, 0, W, H / 2);
+
+      const floorGrad = dCtx.createLinearGradient(0, H / 2, 0, H);
+      floorGrad.addColorStop(0, '#101820'); floorGrad.addColorStop(1, '#05090d');
+      dCtx.fillStyle = floorGrad; dCtx.fillRect(0, H / 2, W, H / 2);
+
+      const rays = 120, fov = Math.PI / 3, stripW = W / rays;
+      const zBuf = new Float32Array(rays);
+
+      for (let i = 0; i < rays; i++) {
+        const rayA = player.a - fov / 2 + (i / rays) * fov;
+        const cosA = Math.cos(rayA), sinA = Math.sin(rayA);
+        let dist = 0.05, hit = 0;
+        while (dist < 14) {
+          const rx = player.x + cosA * dist, ry = player.y + sinA * dist;
+          const mx = Math.floor(rx), my = Math.floor(ry);
+          if (my < 0 || my >= MAP.length || mx < 0 || mx >= MAP[0].length) { hit = 1; break; }
+          if (MAP[my][mx] > 0) { hit = MAP[my][mx]; break; }
+          dist += 0.04;
+        }
+        const perp = dist * Math.cos(rayA - player.a);
+        zBuf[i] = perp;
+        const wallH = Math.min(H, (H * 0.85) / Math.max(0.2, perp));
+        const shade = Math.max(0.22, 1 - perp / 10.5);
+        if (hit === 2) dCtx.fillStyle = `rgb(${Math.round(247*shade)}, ${Math.round(167*shade)}, ${Math.round(36*shade)})`;
+        else if (hit === 3) dCtx.fillStyle = `rgb(${Math.round(239*shade)}, ${Math.round(68*shade)}, ${Math.round(68*shade)})`;
+        else dCtx.fillStyle = `rgb(${Math.round(24*shade)}, ${Math.round(86*shade)}, ${Math.round(102*shade)})`;
+        dCtx.fillRect(i * stripW, (H - wallH) / 2, stripW + 1, wallH);
+      }
+
+      const sorted = enemies
+        .filter(e => e.hp > 0)
+        .map(e => ({ e, dist: Math.hypot(e.x - player.x, e.y - player.y) }))
+        .sort((a, b) => b.dist - a.dist);
+
+      for (const { e, dist } of sorted) {
+        let ang = Math.atan2(e.y - player.y, e.x - player.x) - player.a;
+        while (ang > Math.PI) ang -= Math.PI * 2;
+        while (ang < -Math.PI) ang += Math.PI * 2;
+        if (Math.abs(ang) > fov * 0.7) continue;
+
+        const screenX = (0.5 + ang / fov) * W;
+        const size = Math.min(H * 0.72, (H * 0.65) / Math.max(0.4, dist));
+        const rayIdx = Math.max(0, Math.min(rays - 1, Math.floor((screenX / W) * rays)));
+        if (dist > zBuf[rayIdx] + 0.25) continue;
+
+        dCtx.fillStyle = e.color;
+        dCtx.beginPath(); dCtx.arc(screenX, H / 2, size * 0.36, 0, Math.PI * 2); dCtx.fill();
+        dCtx.fillStyle = e.eye;
+        dCtx.fillRect(screenX - size * 0.12, H / 2 - size * 0.1, size * 0.24, size * 0.14);
+        dCtx.fillStyle = '#071419';
+        dCtx.fillRect(screenX - size * 0.04, H / 2 - size * 0.07, size * 0.08, size * 0.08);
+        dCtx.fillStyle = '#FEF0DD';
+        dCtx.font = 'bold 10px monospace';
+        dCtx.textAlign = 'center';
+        dCtx.fillText(`${e.name} [${e.hp}/${e.maxHp}]`, screenX, H / 2 - size * 0.44);
+      }
+
+      const gunY = H - 64 + (muzzleFlash > 0 ? 7 : 0);
+      if (muzzleFlash > 0) {
+        dCtx.fillStyle = '#34D399';
+        dCtx.beginPath(); dCtx.arc(W / 2, gunY - 8, 22, 0, Math.PI * 2); dCtx.fill();
+      }
+      dCtx.fillStyle = '#1e293b'; dCtx.fillRect(W / 2 - 28, gunY, 56, 68);
+      dCtx.fillStyle = '#34D399'; dCtx.fillRect(W / 2 - 10, gunY + 10, 20, 10);
+      dCtx.fillStyle = '#F7A724'; dCtx.fillRect(W / 2 - 18, gunY + 32, 36, 8);
+
+      dCtx.strokeStyle = 'rgba(52, 211, 153, 0.8)';
+      dCtx.lineWidth = 1.5;
+      dCtx.beginPath();
+      dCtx.moveTo(W / 2 - 8, H / 2); dCtx.lineTo(W / 2 + 8, H / 2);
+      dCtx.moveTo(W / 2, H / 2 - 8); dCtx.lineTo(W / 2, H / 2 + 8);
+      dCtx.stroke();
+
+      const ms = 8, ox = W - MAP[0].length * ms - 10, oy = 10;
+      dCtx.fillStyle = 'rgba(6, 18, 23, 0.78)';
+      dCtx.fillRect(ox - 4, oy - 4, MAP[0].length * ms + 8, MAP.length * ms + 8);
+      for (let r = 0; r < MAP.length; r++) {
+        for (let c = 0; c < MAP[0].length; c++) {
+          if (MAP[r][c] > 0) {
+            dCtx.fillStyle = MAP[r][c] === 3 ? '#EF4444' : '#334155';
+            dCtx.fillRect(ox + c * ms, oy + r * ms, ms - 1, ms - 1);
+          }
+        }
+      }
+      for (const e of enemies) {
+        if (e.hp <= 0) continue;
+        dCtx.fillStyle = e.color;
+        dCtx.fillRect(ox + e.x * ms - 2, oy + e.y * ms - 2, 4, 4);
+      }
+      dCtx.fillStyle = '#34D399';
+      dCtx.fillRect(ox + player.x * ms - 2, oy + player.y * ms - 2, 4, 4);
+    }
+
+    resetDoom();
+    let doomLast = performance.now();
+    function doomLoop(now) {
+      const dt = Math.min(0.05, (now - doomLast) / 1000);
+      doomLast = now;
+      renderDoom(dt);
+      requestAnimationFrame(doomLoop);
+    }
+    requestAnimationFrame(doomLoop);
+
+    /* SYSTEMS SWITCHBOARD */
+    const PROJECTS = {
+      lsm: {
+        tag: 'RUST • ZERO DEPENDENCIES',
+        title: 'lsm-engine — Storage Engine & Live Crypto Cockpit',
+        desc: 'Built from scratch in pure Rust: Write-Ahead Log with IEEE CRC32 crash recovery, MemTable, 4KB SSTables, Bloom Filters, K-way compaction, MVCC snapshot isolation, and a Time-Series DB streaming live BTC/ETH/SOL ticks.',
+        specs: [
+          '10M-record benchmarked LSM-Tree storage engine vs. SQLite',
+          'Material 3 Expressive + 2nd-order spring-physics market cockpit',
+          '18/18 unit & crash-recovery integration tests passing',
+        ],
+        repo: 'lsm-engine',
+      },
+      serverless: {
+        tag: 'PYTHON • CLOUD BENCHMARKING',
+        title: 'serverless_coldstart_benchmark',
+        desc: 'Empirical benchmarking suite measuring serverless cold-start latency distributions, runtime initialization overhead, and warm-invocation tail latencies across workloads.',
+        specs: [
+          'Automated cold vs. warm invocation latency profiling',
+          'Statistical tail-latency (p50 / p95 / p99) capture & plotting',
+          'Reproducible benchmark runner scripts in Python',
+        ],
+        repo: 'serverless_coldstart_benchmark',
+      },
+      hospital: {
+        tag: 'PYTHON + SQL • DBMS',
+        title: 'Hospital_management-DBMS',
+        desc: 'Relational hospital management system engineered with normalized SQL schemas, patient/doctor scheduling workflows, and transactional record management.',
+        specs: [
+          'Normalized relational schema design with integrity constraints',
+          'End-to-end patient admission, billing & staff management',
+          'Clean Python database interface & query layer',
+        ],
+        repo: 'Hospital_management-DBMS',
+      },
+      pokemon: {
+        tag: 'PYTHON • GAME ENGINE',
+        title: 'pokemon-island-royale',
+        desc: 'Interactive battle-royale simulation game built in Python featuring dynamic island encounters, stat-driven combat mechanics, and turn-based survival strategy.',
+        specs: [
+          'Procedural island events & multi-agent battle logic',
+          'Custom elemental damage & survival progression loop',
+          'Modular Python gameplay architecture',
+        ],
+        repo: 'pokemon-island-royale',
+      },
+    };
+
+    const inspectorEl = document.getElementById('project-inspector');
+    function renderProject(key) {
+      const p = PROJECTS[key];
+      document.querySelectorAll('.switch-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.proj === key);
+      });
+      inspectorEl.innerHTML = `
+        <span class="inspector-tag">${p.tag}</span>
+        <h3>${p.title}</h3>
+        <p>${p.desc}</p>
+        <ul class="spec-list">${p.specs.map(s => `<li>${s}</li>`).join('')}</ul>
+        <a class="open-repo-btn" href="${GH_BASE}/${p.repo}" target="_blank" rel="noopener">Inspect Repository on GitHub ↗</a>
+      `;
+    }
+    document.querySelectorAll('.switch-tab').forEach(tab => {
+      tab.addEventListener('click', () => renderProject(tab.dataset.proj));
+    });
+    renderProject('lsm');
+
+    /* OPTIONAL RETRO SYNTH */
+    const audioBtn = document.getElementById('toggle-audio-btn');
+    let audioCtx = null, synthTimer = null, synthPlaying = false;
+    const NOTES = [110, 110, 130.81, 146.83, 110, 110, 164.81, 146.83];
+    let step = 0;
+
+    function playStep() {
+      if (!audioCtx || !synthPlaying) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = NOTES[step % NOTES.length];
+      gain.gain.setValueAtTime(0.045, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.19);
+      step++;
+    }
+
+    audioBtn.addEventListener('click', () => {
+      if (!synthPlaying) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        synthPlaying = true;
+        synthTimer = setInterval(playStep, 220);
+        audioBtn.textContent = '♪ Synth: ON';
+        audioBtn.classList.add('playing');
+      } else {
+        synthPlaying = false;
+        clearInterval(synthTimer);
+        audioBtn.textContent = '♪ Synth: OFF';
+        audioBtn.classList.remove('playing');
+      }
+    });
+  </script>
+</body>
+</html>
